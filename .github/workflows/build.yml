@@ -1,16 +1,83 @@
-name: Inspect Qt Download Links
+name: Build APK
 
 on:
+  push:
+    branches: [main, master]
   workflow_dispatch:
 
 jobs:
-  inspect:
+  build:
     runs-on: ubuntu-22.04
+
     steps:
-      - name: Check available PySide6 versions
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install system dependencies
         run: |
-          echo "=== Contenido de la carpeta de PySide6 ==="
-          curl -s https://download.qt.io/official_releases/QtForPython/pyside6/ | grep -o 'href="[^"]*"' | head -50
+          sudo apt-get update
+          sudo apt-get install -y openjdk-17-jdk build-essential cmake ninja-build wget unzip
+
+      - name: Set JAVA_HOME
+        run: echo "JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64" >> $GITHUB_ENV
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip wheel
+          pip install PySide6==6.7.3 jinja2 pkginfo tqdm tomlkit
+
+      - name: Download PySide6 Android wheels dynamically
+        run: |
+          mkdir -p wheels && cd wheels
+          BASE_URL="https://download.qt.io/official_releases/QtForPython/pyside6/PySide6-6.7.3-src"
           
-          echo "=== Contenido de la carpeta 6.7.3 ==="
-          curl -s https://download.qt.io/official_releases/QtForPython/pyside6/PySide6-6.7.3-src/ | grep -o 'href="[^"]*"' | head -50
+          # Buscar el nombre exacto de la wheel de PySide6 (aarch64)
+          PYSIDE_FILE=$(curl -s $BASE_URL/ | grep -o 'href="[^"]*aarch64\.whl"' | grep -i 'pyside6' | head -1 | cut -d'"' -f2)
+          # Buscar el nombre exacto de la wheel de Shiboken (aarch64)
+          SHIBOKEN_FILE=$(curl -s $BASE_URL/ | grep -o 'href="[^"]*aarch64\.whl"' | grep -i 'shiboken6' | head -1 | cut -d'"' -f2)
+          
+          echo "Descargando: $PYSIDE_FILE"
+          echo "Descargando: $SHIBOKEN_FILE"
+          
+          wget -q "$BASE_URL/$PYSIDE_FILE"
+          wget -q "$BASE_URL/$SHIBOKEN_FILE"
+          
+          ls -la
+          
+          echo "PYSIDE_WHEEL=$(pwd)/$PYSIDE_FILE" >> $GITHUB_ENV
+          echo "SHIBOKEN_WHEEL=$(pwd)/$SHIBOKEN_FILE" >> $GITHUB_ENV
+
+      - name: Init Android project
+        run: |
+          mkdir -p android && cd android
+          pyside6-android-deploy --init \
+            --wheel-pyside="${{ env.PYSIDE_WHEEL }}" \
+            --wheel-shiboken="${{ env.SHIBOKEN_WHEEL }}"
+
+      - name: Copy source files
+        run: |
+          cp core.py          android/src/core.py
+          cp main.py          android/src/main.py
+          cp mobile_main.py   android/src/mobile_main.py
+          cp desktop_main.py  android/src/desktop_main.py
+          cp pyproject.toml   android/pyproject.toml
+
+      - name: Build APK
+        run: |
+          cd android
+          pyside6-android-deploy \
+            --wheel-pyside="${{ env.PYSIDE_WHEEL }}" \
+            --wheel-shiboken="${{ env.SHIBOKEN_WHEEL }}"
+
+      - name: Upload APK
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: textucreator-debug-apk
+          path: android/build/android/gradle/build/outputs/apk/debug/*.apk
+          retention-days: 30
