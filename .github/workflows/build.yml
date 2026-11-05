@@ -21,37 +21,40 @@ jobs:
       - name: Install system dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y openjdk-17-jdk build-essential cmake ninja-build
+          sudo apt-get install -y openjdk-17-jdk build-essential cmake ninja-build wget unzip
 
       - name: Set JAVA_HOME
         run: echo "JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64" >> $GITHUB_ENV
 
-      - name: Install Python dependencies
+      - name: Install PySide6 dependencies
         run: |
           python -m pip install --upgrade pip wheel
-          # Instalamos aqtinstall para descargar Qt correctamente
-          pip install aqtinstall
-          # Instalamos el empaquetador de Android (requiere PySide6 local)
           pip install PySide6==6.7.3 jinja2 pkginfo tqdm tomlkit
 
-      - name: Download PySide6 Android wheels using aqtinstall
+      - name: Download PySide6 Android wheels
         run: |
-          # aqtinstall busca en los servidores de Qt y descarga la wheel correcta para Android
-          python -m aqt install-pyside6 6.7.3 android_arm64 --outputdir wheels
+          mkdir -p wheels && cd wheels
           
-          # Verificamos qué descargó
-          ls -la wheels/
+          # URL base de las releases de PySide6
+          BASE_URL="https://download.qt.io/official_releases/QtForPython/pyside6/PySide6-6.7.3-src"
           
-          # Guardamos las rutas para usarlas en el siguiente paso
-          echo "PYSIDE_WHEEL=$(find wheels -name 'PySide6-*.whl' | head -1)" >> $GITHUB_ENV
-          echo "SHIBOKEN_WHEEL=$(find wheels -name 'shiboken6-*.whl' | head -1)" >> $GITHUB_ENV
+          # Descargar la wheel de PySide6 y shiboken6 para Android
+          wget -q $BASE_URL/PySide6-6.7.3-cp39-abi3-linux_aarch64.whl || \
+          wget -q $BASE_URL/PySide6-6.7.3-cp311-cp311-linux_aarch64.whl
+          
+          wget -q $BASE_URL/shiboken6-6.7.3-cp39-abi3-linux_aarch64.whl || \
+          wget -q $BASE_URL/shiboken6-6.7.3-cp311-cp311-linux_aarch64.whl
+          
+          ls -la
+          echo "PYSIDE_WHEEL=$(pwd)/$(ls PySide6-*.whl | head -1)" >> $GITHUB_ENV
+          echo "SHIBOKEN_WHEEL=$(pwd)/$(ls shiboken6-*.whl | head -1)" >> $GITHUB_ENV
 
       - name: Init Android project
         run: |
           mkdir -p android && cd android
           pyside6-android-deploy --init \
-            --wheel-pyside="../${{ env.PYSIDE_WHEEL }}" \
-            --wheel-shiboken="../${{ env.SHIBOKEN_WHEEL }}"
+            --wheel-pyside="${{ env.PYSIDE_WHEEL }}" \
+            --wheel-shiboken="${{ env.SHIBOKEN_WHEEL }}"
 
       - name: Copy source files
         run: |
@@ -65,8 +68,8 @@ jobs:
         run: |
           cd android
           pyside6-android-deploy \
-            --wheel-pyside="../${{ env.PYSIDE_WHEEL }}" \
-            --wheel-shiboken="../${{ env.SHIBOKEN_WHEEL }}"
+            --wheel-pyside="${{ env.PYSIDE_WHEEL }}" \
+            --wheel-shiboken="${{ env.SHIBOKEN_WHEEL }}"
 
       - name: Upload APK
         if: success()
