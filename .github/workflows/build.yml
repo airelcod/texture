@@ -38,23 +38,26 @@ jobs:
           echo "ANDROID_NDK_ROOT=$(pwd)/android-ndk-r25c" >> $GITHUB_ENV
           echo "NDK_PATH=$(pwd)/android-ndk-r25c" >> $GITHUB_ENV
 
-      - name: Download PySide6 Android wheels (with safe renaming)
+      - name: Download PySide6 Android wheels
         run: |
           mkdir -p wheels && cd wheels
           BASE_URL="https://download.qt.io/official_releases/QtForPython/pyside6/PySide6-6.7.3-src"
           
-          # Encontrar los archivos
-          PYSIDE_RAW=$(curl -s $BASE_URL/ | grep -o 'href="[^"]*aarch64\.whl"' | grep -i 'pyside6' | head -1 | cut -d'"' -f2)
-          SHIBOKEN_RAW=$(curl -s $BASE_URL/ | grep -o 'href="[^"]*aarch64\.whl"' | grep -i 'shiboken6' | head -1 | cut -d'"' -f2)
+          # URLs exactas de las wheels
+          PYSIDE_FILE="PySide6-6.7.3-cp39-abi3-linux_aarch64.whl"
+          SHIBOKEN_FILE="shiboken6-6.7.3-cp39-abi3-linux_aarch64.whl"
           
-          # Descargarlos
-          wget -q "$BASE_URL/$PYSIDE_RAW"
-          wget -q "$BASE_URL/$SHIBOKEN_RAW"
+          echo "Descargando $BASE_URL/$PYSIDE_FILE ..."
+          wget -q "$BASE_URL/$PYSIDE_FILE"
+          echo "Descargando $BASE_URL/$SHIBOKEN_FILE ..."
+          wget -q "$BASE_URL/$SHIBOKEN_FILE"
           
-          # Renombrar a un formato estándar que el deployer acepte
-          # Formato esperado: PySide6-6.7.3-cp311-cp311-linux_aarch64.whl
-          mv "$PYSIDE_RAW" "PySide6-6.7.3-cp311-cp311-linux_aarch64.whl"
-          mv "$SHIBOKEN_RAW" "shiboken6-6.7.3-cp311-cp311-linux_aarch64.whl"
+          ls -la
+          
+          # Renombrar a cp311-cp311 para que el deployer lo acepte sin quejarse
+          # (Los archivos de Qt son cp39-abi3 pero sirven para 3.11)
+          mv "$PYSIDE_FILE" "PySide6-6.7.3-cp311-cp311-linux_aarch64.whl"
+          mv "$SHIBOKEN_FILE" "shiboken6-6.7.3-cp311-cp311-linux_aarch64.whl"
           
           echo "PYSIDE_WHEEL=$(pwd)/PySide6-6.7.3-cp311-cp311-linux_aarch64.whl" >> $GITHUB_ENV
           echo "SHIBOKEN_WHEEL=$(pwd)/shiboken6-6.7.3-cp311-cp311-linux_aarch64.whl" >> $GITHUB_ENV
