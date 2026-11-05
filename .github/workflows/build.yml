@@ -1,0 +1,53 @@
+name: Build APK
+
+on:
+  push:
+    branches: [main, master]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y openjdk-17-jdk build-essential cmake ninja-build
+
+      - name: Install Python dependencies
+        run: |
+          pip install --upgrade pip wheel
+          pip install "PySide6-Essentials" "pyside6-android-deploy"
+
+      - name: Init Android project
+        run: |
+          mkdir -p android
+          cd android
+          pyside6-android-deploy --init
+
+      - name: Copy source files
+        run: |
+          cp core.py          android/src/core.py
+          cp main.py          android/src/main.py
+          cp mobile_main.py   android/src/mobile_main.py
+          cp desktop_main.py  android/src/desktop_main.py
+          cp pyproject.toml   android/pyproject.toml
+
+      - name: Build APK
+        run: |
+          cd android
+          pyside6-android-deploy
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: textucreator-debug-apk
+          path: android/build/android/gradle/build/outputs/apk/debug/*.apk
+          retention-days: 30
