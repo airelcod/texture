@@ -10,22 +10,44 @@ jobs:
     runs-on: ubuntu-22.04
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-      - uses: actions/setup-python@v5
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
         with:
           python-version: '3.11'
+
+      - name: Confirm Python version
+        run: |
+          python --version
+          pip --version
 
       - name: Install system dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y openjdk-17-jdk build-essential cmake ninja-build
 
-      - name: Install Python dependencies
+      - name: Set JAVA_HOME
+        run: echo "JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64" >> $GITHUB_ENV
+
+      - name: Install PySide6 (includes pyside6-android-deploy)
         run: |
           python -m pip install --upgrade pip wheel
           pip install PySide6
           pip install tomlkit
+
+      - name: Install pyside6-android-deploy extra requirements
+        run: |
+          pip install jinja2 pkginfo tqdm
+          # Instala el requirements-android.txt del propio paquete (si existe)
+          PYSIDE_PATH=$(python -c "import PySide6, os; print(os.path.dirname(PySide6.__file__))")
+          if [ -f "$PYSIDE_PATH/scripts/requirements-android.txt" ]; then
+            pip install -r "$PYSIDE_PATH/scripts/requirements-android.txt"
+          fi
+
+      - name: Verify deployer is available
+        run: which pyside6-android-deploy && pyside6-android-deploy --version || true
 
       - name: Init Android project
         run: |
@@ -47,8 +69,19 @@ jobs:
           pyside6-android-deploy
 
       - name: Upload APK
+        if: success()
         uses: actions/upload-artifact@v4
         with:
           name: textucreator-debug-apk
           path: android/build/android/gradle/build/outputs/apk/debug/*.apk
           retention-days: 30
+
+      - name: Upload build logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-logs
+          path: |
+            android/build/**/*.log
+            android/build/**/*.txt
+          retention-days: 7
