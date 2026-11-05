@@ -1,0 +1,17 @@
+[project]
+name = "TextuCreator"
+version = "0.1.0"
+description = "Creador de Texturas"
+requires-python = ">=3.10"
+dependencies = ["PySide6-Essentials"]
+
+[tool.pyside6-android-deploy]
+package_name = "com.tuorg.textucreator"
+app_name = "Creador de Texturas"
+orientation = "landscape"
+api_level = 33
+archs = ["arm64-v8a"]
+permissions = [
+    "android.permission.READ_EXTERNAL_STORAGE",
+    "android.permission.WRITE_EXTERNAL_STORAGE",
+]
