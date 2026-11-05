@@ -18,11 +18,6 @@ jobs:
         with:
           python-version: '3.11'
 
-      - name: Confirm Python version
-        run: |
-          python --version
-          pip --version
-
       - name: Install system dependencies
         run: |
           sudo apt-get update
@@ -31,23 +26,14 @@ jobs:
       - name: Set JAVA_HOME
         run: echo "JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64" >> $GITHUB_ENV
 
-      - name: Install PySide6 (includes pyside6-android-deploy)
+      - name: Install PySide6 6.7.3 (versión con --init)
         run: |
           python -m pip install --upgrade pip wheel
-          pip install PySide6
-          pip install tomlkit
+          pip install "PySide6==6.7.3" tomlkit jinja2 pkginfo tqdm
 
-      - name: Install pyside6-android-deploy extra requirements
+      - name: Verify deployer accepts --init
         run: |
-          pip install jinja2 pkginfo tqdm
-          # Instala el requirements-android.txt del propio paquete (si existe)
-          PYSIDE_PATH=$(python -c "import PySide6, os; print(os.path.dirname(PySide6.__file__))")
-          if [ -f "$PYSIDE_PATH/scripts/requirements-android.txt" ]; then
-            pip install -r "$PYSIDE_PATH/scripts/requirements-android.txt"
-          fi
-
-      - name: Verify deployer is available
-        run: which pyside6-android-deploy && pyside6-android-deploy --version || true
+          pyside6-android-deploy --help | grep -E "init|wheel-pyside" || echo "WARNING: no --init in help"
 
       - name: Init Android project
         run: |
