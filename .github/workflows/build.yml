@@ -31,6 +31,14 @@ jobs:
           python -m pip install --upgrade pip wheel
           pip install PySide6==6.7.3 jinja2 pkginfo tqdm tomlkit
 
+      - name: Download Android NDK
+        run: |
+          # Descargamos el NDK r25c (versión estable compatible con Qt 6.7)
+          wget -q https://dl.google.com/android/repository/android-ndk-r25c-linux.zip
+          unzip -q android-ndk-r25c-linux.zip
+          echo "ANDROID_NDK_ROOT=$(pwd)/android-ndk-r25c" >> $GITHUB_ENV
+          echo "NDK_PATH=$(pwd)/android-ndk-r25c" >> $GITHUB_ENV
+
       - name: Download PySide6 Android wheels dynamically
         run: |
           mkdir -p wheels && cd wheels
@@ -56,18 +64,19 @@ jobs:
 
       - name: Init Android project
         run: |
-          # Nos movemos a la carpeta que YA tiene main.py
           cd android
           pyside6-android-deploy --init \
             --wheel-pyside="${{ env.PYSIDE_WHEEL }}" \
-            --wheel-shiboken="${{ env.SHIBOKEN_WHEEL }}"
+            --wheel-shiboken="${{ env.SHIBOKEN_WHEEL }}" \
+            --ndk-path="${{ env.NDK_PATH }}"
 
       - name: Build APK
         run: |
           cd android
           pyside6-android-deploy \
             --wheel-pyside="${{ env.PYSIDE_WHEEL }}" \
-            --wheel-shiboken="${{ env.SHIBOKEN_WHEEL }}"
+            --wheel-shiboken="${{ env.SHIBOKEN_WHEEL }}" \
+            --ndk-path="${{ env.NDK_PATH }}"
 
       - name: Upload APK
         if: success()
