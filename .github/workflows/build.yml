@@ -23,8 +23,9 @@ jobs:
 
       - name: Install Python dependencies
         run: |
-          pip install --upgrade pip wheel
-          pip install "PySide6-Essentials" "pyside6-android-deploy"
+          python -m pip install --upgrade pip wheel
+          pip install PySide6
+          pip install tomlkit
 
       - name: Init Android project
         run: |
