@@ -1,12 +1,85 @@
-name: Inspect Files
+name: Build APK
 
 on:
+  push:
+    branches: [main, master]
   workflow_dispatch:
 
 jobs:
-  inspect:
+  build:
     runs-on: ubuntu-22.04
+
     steps:
-      - name: List exact files in the folder
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install system dependencies
         run: |
-          curl -s https://download.qt.io/official_releases/QtForPython/pyside6/PySide6-6.7.3-src/ | grep -o 'href="[^"]*"' | grep -i whl
+          sudo apt-get update
+          sudo apt-get install -y openjdk-17-jdk build-essential cmake ninja-build wget unzip
+
+      - name: Set JAVA_HOME
+        run: echo "JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64" >> $GITHUB_ENV
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip wheel
+          pip install PySide6==6.7.3 jinja2 pkginfo tqdm tomlkit aqtinstall
+
+      - name: Download Android NDK
+        run: |
+          wget -q https://dl.google.com/android/repository/android-ndk-r25c-linux.zip
+          unzip -q android-ndk-r25c-linux.zip
+          echo "NDK_PATH=$(pwd)/android-ndk-r25c" >> $GITHUB_ENV
+
+      - name: Download PySide6 Android wheels using aqt
+        run: |
+          mkdir -p wheels
+          # aqt descarga el repositorio oficial de Qt automáticamente
+          # El comando correcto para PySide6 es install-qt con el módulo "pyside6"
+          python -m aqt install-qt linux android_arm64 6.7.3 --archives pyside6 --outputdir wheels
+          
+          # Localizamos las wheels descargadas
+          PYSIDE_WHEEL=$(find wheels -name 'PySide6-*.whl' | head -1)
+          SHIBOKEN_WHEEL=$(find wheels -name 'shiboken6-*.whl' | head -1)
+          
+          echo "PYSIDE_WHEEL=$(pwd)/$PYSIDE_WHEEL" >> $GITHUB_ENV
+          echo "SHIBOKEN_WHEEL=$(pwd)/$SHIBOKEN_WHEEL" >> $GITHUB_ENV
+
+      - name: Copy source files to project folder
+        run: |
+          mkdir -p android
+          cp core.py          android/core.py
+          cp main.py          android/main.py
+          cp mobile_main.py   android/mobile_main.py
+          cp desktop_main.py  android/desktop_main.py
+          cp pyproject.toml   android/pyproject.toml
+
+      - name: Init Android project
+        run: |
+          cd android
+          pyside6-android-deploy --init \
+            --wheel-pyside="${{ env.PYSIDE_WHEEL }}" \
+            --wheel-shiboken="${{ env.SHIBOKEN_WHEEL }}" \
+            --ndk-path="${{ env.NDK_PATH }}"
+
+      - name: Build APK
+        run: |
+          cd android
+          pyside6-android-deploy \
+            --wheel-pyside="${{ env.PYSIDE_WHEEL }}" \
+            --wheel-shiboken="${{ env.SHIBOKEN_WHEEL }}" \
+            --ndk-path="${{ env.NDK_PATH }}"
+
+      - name: Upload APK
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: textucreator-debug-apk
+          path: android/build/android/gradle/build/outputs/apk/debug/*.apk
+          retention-days: 30
