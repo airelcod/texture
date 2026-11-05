@@ -1,96 +1,12 @@
-name: Build APK
+name: Inspect Files
 
 on:
-  push:
-    branches: [main, master]
   workflow_dispatch:
 
 jobs:
-  build:
+  inspect:
     runs-on: ubuntu-22.04
-
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Set up Python 3.11
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-
-      - name: Install system dependencies
+      - name: List exact files in the folder
         run: |
-          sudo apt-get update
-          sudo apt-get install -y openjdk-17-jdk build-essential cmake ninja-build wget unzip
-
-      - name: Set JAVA_HOME
-        run: echo "JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64" >> $GITHUB_ENV
-
-      - name: Install Python dependencies
-        run: |
-          python -m pip install --upgrade pip wheel
-          pip install PySide6==6.7.3 jinja2 pkginfo tqdm tomlkit
-
-      - name: Download Android NDK
-        run: |
-          wget -q https://dl.google.com/android/repository/android-ndk-r25c-linux.zip
-          unzip -q android-ndk-r25c-linux.zip
-          echo "ANDROID_NDK_ROOT=$(pwd)/android-ndk-r25c" >> $GITHUB_ENV
-          echo "NDK_PATH=$(pwd)/android-ndk-r25c" >> $GITHUB_ENV
-
-      - name: Download PySide6 Android wheels
-        run: |
-          mkdir -p wheels && cd wheels
-          BASE_URL="https://download.qt.io/official_releases/QtForPython/pyside6/PySide6-6.7.3-src"
-          
-          # URLs exactas de las wheels
-          PYSIDE_FILE="PySide6-6.7.3-cp39-abi3-linux_aarch64.whl"
-          SHIBOKEN_FILE="shiboken6-6.7.3-cp39-abi3-linux_aarch64.whl"
-          
-          echo "Descargando $BASE_URL/$PYSIDE_FILE ..."
-          wget -q "$BASE_URL/$PYSIDE_FILE"
-          echo "Descargando $BASE_URL/$SHIBOKEN_FILE ..."
-          wget -q "$BASE_URL/$SHIBOKEN_FILE"
-          
-          ls -la
-          
-          # Renombrar a cp311-cp311 para que el deployer lo acepte sin quejarse
-          # (Los archivos de Qt son cp39-abi3 pero sirven para 3.11)
-          mv "$PYSIDE_FILE" "PySide6-6.7.3-cp311-cp311-linux_aarch64.whl"
-          mv "$SHIBOKEN_FILE" "shiboken6-6.7.3-cp311-cp311-linux_aarch64.whl"
-          
-          echo "PYSIDE_WHEEL=$(pwd)/PySide6-6.7.3-cp311-cp311-linux_aarch64.whl" >> $GITHUB_ENV
-          echo "SHIBOKEN_WHEEL=$(pwd)/shiboken6-6.7.3-cp311-cp311-linux_aarch64.whl" >> $GITHUB_ENV
-
-      - name: Copy source files to project folder
-        run: |
-          mkdir -p android
-          cp core.py          android/core.py
-          cp main.py          android/main.py
-          cp mobile_main.py   android/mobile_main.py
-          cp desktop_main.py  android/desktop_main.py
-          cp pyproject.toml   android/pyproject.toml
-
-      - name: Init Android project
-        run: |
-          cd android
-          pyside6-android-deploy --init \
-            --wheel-pyside="${{ env.PYSIDE_WHEEL }}" \
-            --wheel-shiboken="${{ env.SHIBOKEN_WHEEL }}" \
-            --ndk-path="${{ env.NDK_PATH }}"
-
-      - name: Build APK
-        run: |
-          cd android
-          pyside6-android-deploy \
-            --wheel-pyside="${{ env.PYSIDE_WHEEL }}" \
-            --wheel-shiboken="${{ env.SHIBOKEN_WHEEL }}" \
-            --ndk-path="${{ env.NDK_PATH }}"
-
-      - name: Upload APK
-        if: success()
-        uses: actions/upload-artifact@v4
-        with:
-          name: textucreator-debug-apk
-          path: android/build/android/gradle/build/outputs/apk/debug/*.apk
-          retention-days: 30
+          curl -s https://download.qt.io/official_releases/QtForPython/pyside6/PySide6-6.7.3-src/ | grep -o 'href="[^"]*"' | grep -i whl
