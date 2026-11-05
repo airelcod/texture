@@ -36,36 +36,31 @@ jobs:
           mkdir -p wheels && cd wheels
           BASE_URL="https://download.qt.io/official_releases/QtForPython/pyside6/PySide6-6.7.3-src"
           
-          # Buscar el nombre exacto de la wheel de PySide6 (aarch64)
           PYSIDE_FILE=$(curl -s $BASE_URL/ | grep -o 'href="[^"]*aarch64\.whl"' | grep -i 'pyside6' | head -1 | cut -d'"' -f2)
-          # Buscar el nombre exacto de la wheel de Shiboken (aarch64)
           SHIBOKEN_FILE=$(curl -s $BASE_URL/ | grep -o 'href="[^"]*aarch64\.whl"' | grep -i 'shiboken6' | head -1 | cut -d'"' -f2)
-          
-          echo "Descargando: $PYSIDE_FILE"
-          echo "Descargando: $SHIBOKEN_FILE"
           
           wget -q "$BASE_URL/$PYSIDE_FILE"
           wget -q "$BASE_URL/$SHIBOKEN_FILE"
           
-          ls -la
-          
           echo "PYSIDE_WHEEL=$(pwd)/$PYSIDE_FILE" >> $GITHUB_ENV
           echo "SHIBOKEN_WHEEL=$(pwd)/$SHIBOKEN_FILE" >> $GITHUB_ENV
 
+      - name: Copy source files to project folder
+        run: |
+          mkdir -p android
+          cp core.py          android/core.py
+          cp main.py          android/main.py
+          cp mobile_main.py   android/mobile_main.py
+          cp desktop_main.py  android/desktop_main.py
+          cp pyproject.toml   android/pyproject.toml
+
       - name: Init Android project
         run: |
-          mkdir -p android && cd android
+          # Nos movemos a la carpeta que YA tiene main.py
+          cd android
           pyside6-android-deploy --init \
             --wheel-pyside="${{ env.PYSIDE_WHEEL }}" \
             --wheel-shiboken="${{ env.SHIBOKEN_WHEEL }}"
-
-      - name: Copy source files
-        run: |
-          cp core.py          android/src/core.py
-          cp main.py          android/src/main.py
-          cp mobile_main.py   android/src/mobile_main.py
-          cp desktop_main.py  android/src/desktop_main.py
-          cp pyproject.toml   android/pyproject.toml
 
       - name: Build APK
         run: |
